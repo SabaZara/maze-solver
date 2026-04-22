@@ -45,6 +45,21 @@ with st.sidebar:
 
     st.divider()
 
+    loop_factor = st.slider(
+        "Loop Factor",
+        min_value=0.0, max_value=0.5, value=0.0, step=0.05,
+        help="0 = perfect maze (one unique path — algorithms find same length). "
+             "Higher = more walls removed, creating shortcuts and loops. "
+             "This makes BFS/A* and DFS find DIFFERENT path lengths."
+    )
+
+    if loop_factor == 0.0:
+        st.caption("🔒 Perfect maze — all algorithms find the same path length.")
+    else:
+        st.caption(f"🔀 Imperfect maze — {int(loop_factor*100)}% of walls removed. Algorithms will diverge!")
+
+    st.divider()
+
     view_mode = st.radio(
         "View Mode",
         ["Side by Side", "Animate: BFS", "Animate: DFS", "Animate: A*"],
@@ -67,10 +82,11 @@ with st.sidebar:
 # ─── SESSION STATE INIT ──────────────────────────────────────────────────────
 
 if "grid" not in st.session_state or gen_btn:
-    st.session_state.grid    = generate_maze(rows, cols)
-    st.session_state.rows    = rows
-    st.session_state.cols    = cols
-    st.session_state.results = None  # clear previous solutions
+    st.session_state.grid        = generate_maze(rows, cols, loop_factor)
+    st.session_state.rows        = rows
+    st.session_state.cols        = cols
+    st.session_state.loop_factor = loop_factor
+    st.session_state.results     = None  # clear previous solutions
 
 grid = st.session_state.grid
 s_rows = st.session_state.rows
@@ -248,18 +264,34 @@ with tab_stats:
         st.bar_chart(df.set_index("Algorithm")["Solve Time (ms)"])
 
         st.divider()
+        lf = st.session_state.get("loop_factor", 0.0)
+        if lf == 0.0:
+            st.info(
+                f"**Perfect maze** (Loop Factor = 0) — only one path exists between any two cells, "
+                f"so all algorithms find the same path length. "
+                f"Increase the **Loop Factor** slider to remove walls and create shortcuts: "
+                f"BFS and A\\* will find shorter paths than DFS. Total cells: **{total_cells}**."
+            )
+        else:
+            path_lengths = {name: r.path_length for name, r in results.items()}
+            if len(set(path_lengths.values())) == 1:
+                st.info(
+                    f"**Imperfect maze** (Loop Factor = {lf}) — loops exist but all algorithms "
+                    f"found the same path length this time. Try regenerating or increasing the loop factor further."
+                )
+            else:
+                best = min(path_lengths, key=path_lengths.get)
+                worst = max(path_lengths, key=path_lengths.get)
+                st.success(
+                    f"**Imperfect maze** (Loop Factor = {lf}) — algorithms found **different** path lengths! "
+                    f"**{best}** found the shortest ({path_lengths[best]} steps), "
+                    f"**{worst}** found the longest ({path_lengths[worst]} steps). "
+                    f"This proves BFS and A\\* are optimal; DFS is not."
+                )
         st.markdown(f"""
-        **Note — why all path lengths are equal here:**
-        This is a *perfect maze* (single unique path between any two cells), so every
-        algorithm finds the same one path. The differences that matter are **efficiency**:
-        how much of the maze each algorithm had to explore before finding it.
+        **BFS** — explores all cells at distance *d* before *d+1*. Always finds the shortest path.
 
-        **BFS** explores all cells at distance *d* before moving to *d+1* — systematic but
-        visits many cells it doesn't need. Total cells in this maze: **{total_cells}**.
+        **DFS** — dives deep before backtracking. Fast but takes long winding routes when loops exist.
 
-        **DFS** dives straight down one branch — often stumbles onto the goal quickly with
-        less wasted exploration, but gives no guarantees on non-perfect mazes.
-
-        **A\\*** uses Manhattan distance to bias toward the goal — in open mazes it skips
-        dead-end branches early, making it the most focused searcher.
+        **A\\*** — uses Manhattan distance heuristic to steer toward the goal. Shortest path with less exploration than BFS.
         """)
