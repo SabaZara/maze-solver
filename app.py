@@ -222,14 +222,23 @@ with tab_stats:
         st.divider()
 
         # ── Winner callouts ───────────────────────────────────────────────────
-        best_eff   = df.loc[df["Efficiency (%)"].idxmax(), "Algorithm"]
-        best_time  = df.loc[df["Solve Time (ms)"].idxmin(), "Algorithm"]
-        best_waste = df.loc[df["Wasted Exploration"].idxmin(), "Algorithm"]
+        min_path   = df["Path Length"].min()
+        # Shortest path winner: among algorithms that found the OPTIMAL path only
+        optimal_df = df[df["Path Length"] == min_path]
+        # Among optimal ones, who visited fewest cells?
+        best_search = optimal_df.loc[optimal_df["Cells Visited"].idxmin(), "Algorithm"]
+        best_time   = df.loc[df["Solve Time (ms)"].idxmin(), "Algorithm"]
+        best_path   = optimal_df["Algorithm"].tolist()
 
         w1, w2, w3 = st.columns(3)
-        w1.success(f"Most efficient path: **{best_eff}**")
-        w2.success(f"Fastest runtime: **{best_time}**")
-        w3.success(f"Least wasted exploration: **{best_waste}**")
+        if len(best_path) == len(df):
+            w1.info(f"All found same path length: **{min_path}** steps")
+        else:
+            non_optimal = df[df["Path Length"] > min_path]["Algorithm"].tolist()
+            w1.success(f"Shortest path: **{', '.join(best_path)}** ({min_path} steps)")
+            w1.error(f"Suboptimal: **{', '.join(non_optimal)}** ({df[df['Path Length']>min_path]['Path Length'].values[0]} steps)")
+        w2.success(f"Fewest cells visited (among optimal): **{best_search}**")
+        w3.success(f"Fastest runtime: **{best_time}**")
 
         st.divider()
 
@@ -237,9 +246,9 @@ with tab_stats:
         c1, c2 = st.columns(2)
 
         with c1:
-            st.subheader("Efficiency (%) — higher is better")
-            st.caption("Path length ÷ cells visited × 100. 100% = explored nothing wasted.")
-            st.bar_chart(df.set_index("Algorithm")["Efficiency (%)"])
+            st.subheader("Cells Visited — lower is better")
+            st.caption("How many cells each algorithm explored. Lower = more focused search. Note: DFS may visit fewer cells but find a longer path.")
+            st.bar_chart(df.set_index("Algorithm")["Cells Visited"])
 
         with c2:
             st.subheader("Search Overhead — lower is better")
