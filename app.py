@@ -68,10 +68,10 @@ with st.sidebar:
 
     anim_speed = st.slider(
         "Animation Speed",
-        min_value=1, max_value=10, value=5,
+        min_value=1, max_value=10, value=10,
         help="Higher = faster animation"
     )
-    sleep_time = max(0.01, 0.15 - anim_speed * 0.013)
+    sleep_time = max(0.005, 0.10 - anim_speed * 0.0095)
 
     st.divider()
 
